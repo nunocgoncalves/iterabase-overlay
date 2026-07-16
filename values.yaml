@@ -1,73 +1,16 @@
-# Base Helm values — the standard Iterabase bare-metal prod recipe.
+# Base Helm values — E2E TEST FIXTURE (minimal).
 #
-# OVERRIDES the iterabase-platform chart's kind/E2E defaults (self-signed issuer,
-# IPv4, MetalLB/external-dns disabled) for a production bare-metal deploy:
-# MetalLB L2 (IPv6) + cert-manager/Let's Encrypt (DNS-01 via Cloudflare) +
-# external-dns (Cloudflare-proxied) + the inference gateway on a public HTTPS
-# edge.
+# This `e2e` branch is a test fixture for forge's e2e suites (overlay-e2e,
+# flux-e2e). `master` holds the bare-metal PROD recipe (HOR-299): real values
+# with `required` placeholders that fail loudly until a client fork fills
+# values.client.yaml — by design not deployable as-is. A cloud CI VM (DigitalOcean
+# droplet, IPv4, no Cloudflare, no real domain) can't deploy the prod recipe, so
+# this fixture is intentionally minimal: no values => the iterabase-platform
+# chart's own E2E-friendly defaults apply (self-signed issuer, IPv4, MetalLB and
+# external-dns disabled) and it deploys cleanly on a cloud VM.
 #
-# Clients fork this repo and fill values.client.yaml (applied AFTER this file;
-# later file wins). Values marked REQUIRED must be overridden there — the base
-# recipe is intentionally not deployable as-is (placeholders fail loudly, e.g.
-# cert-issuers.letsencrypt.email is `required`).
-#
-# Cloud deploys: override the LB implementation (metallb.enabled=false + cloud LB
-# annotations on ingress-nginx.controller.service) and the IP family in
-# values.client.yaml.
+# This validates forge's MECHANICS (clone -> helm -f values.yaml -f
+# values.client.yaml -> kubectl apply -k crds/client/) on a real host. The prod
+# recipe's deployability is validated by HOR-299's real OPO1 client fork.
 #
 # forge applies:  helm -f values.yaml -f values.client.yaml
-
-# --- LoadBalancer: MetalLB L2 (bare-metal; IPv6) ---
-# Cloud deploys: set metallb.enabled=false and provision via the cloud LB.
-metallb:
-  enabled: true
-  crds:
-    enabled: true
-
-metallb-config:
-  enabled: true
-  addresses: [] # REQUIRED (values.client.yaml): public IPv6 CIDR/range, e.g. ["2001:db8::100-2001:db8::10f"]
-
-ingress-nginx:
-  controller:
-    service:
-      type: LoadBalancer
-      ipFamilyPolicy: SingleStack # OPO1 = IPv6; dual-stack deploys: PreferDualStack + [IPv4, IPv6]
-      ipFamilies:
-        - IPv6
-
-# --- Edge TLS: Let's Encrypt DNS-01 via Cloudflare ---
-cert-manager:
-  enabled: true
-  crds:
-    enabled: true
-
-cert-issuers:
-  enabled: true
-  selfSigned:
-    enabled: false # prod: no self-signed
-  letsencrypt:
-    enabled: true
-    email: "" # REQUIRED (values.client.yaml): ACME email for Let's Encrypt notifications
-
-# --- Edge DNS: external-dns → Cloudflare (proxied) ---
-# The CF_API_TOKEN secretRef (cloudflare-api-token/api-token) + cloudflare-proxied
-# are chart defaults; forge materializes the Secret from secrets.yaml (HOR-364).
-external-dns:
-  enabled: true
-  policy: upsert-only # never prune manual records (safe with a hand-managed zone)
-  domainFilters: [] # REQUIRED (values.client.yaml): Cloudflare zone, e.g. ["example.com."]
-
-# --- Inference gateway: public HTTPS edge ---
-inference-gateway:
-  ingress:
-    host: "" # REQUIRED (values.client.yaml): public hostname, e.g. inference.example.com
-    tls:
-      enabled: true
-      clusterIssuer: letsencrypt-prod
-    externalDns:
-      enabled: true # annotate Ingress → external-dns creates the proxied AAAA
-
-# Data deps: Postgres (pgvector, via the control-plane chart) + Redis stay at
-# chart defaults (enabled). MinIO is enabled by default; disable in
-# values.client.yaml when unused (e.g. prod-inference-only).
