@@ -2,7 +2,7 @@
 
 The **product base overlay repo** for the Iterabase platform — the upstream template each client deployment forks. Part of the forge overlay system (HOR-341).
 
-> **Status:** minimal scaffold (HOR-341). The `pi/` tool library is deferred to HOR-351; the real opinionated deployment recipe + CRD instances land per-deployment (e.g. OPO1, HOR-299).
+> **Status:** base prod recipe landed (HOR-299 — `values.yaml` carries the standard bare-metal prod recipe with per-deployment placeholders). The `pi/` tool library is deferred to HOR-351; CRD instances land per-deployment in client forks (e.g. OPO1).
 
 ## What this is
 
@@ -12,7 +12,7 @@ The fork model (Horizonshift Platform Direction §5):
 
 - **Base repo (this repo)** = the product template: base Helm values + base CRD instances, versioned with the platform.
 - **Client overlay repo = a fork** of this repo. Client-specific config lives in client-owned paths (no merge conflicts on upstream sync).
-- **Clients opt in to product updates** by syncing their fork with upstream (`git merge`/`rebase`). Pushes to this base repo have **no effect** on client infra until the client syncs. Clients can **pin to a tag** for stability.
+- **Clients opt in to product updates** by syncing their fork with upstream (`git merge`/`rebase`). The default is tracking upstream `master`, and this deliberate sync IS the safety gate — pushes to this base repo have **no effect** on client infra until the client syncs. Pinning to a tag is optional (see below).
 - **No base+client merge at apply time** — the "merge" is a git-level fork sync, client-initiated. `forge apply --overlay` takes ONE input (the client fork, self-contained).
 - **Flux** (HOR-292, target architecture) watches the **client fork only** → push-to-Git auto-reconcile. Base-repo pushes don't trigger reconciliation.
 
@@ -54,7 +54,7 @@ Clients **never edit** `crds/base/` or `values.yaml` — that would cause merge 
    git merge upstream/master   # or: git rebase upstream/master
    ```
    Because client config lives in `values.client.yaml` + `crds/client/` (dedicated paths), upstream syncs rarely conflict.
-4. **Pin for stability** (optional): set `overlay.ref` to a tag instead of `master`. Tags are cut with platform releases (first tag `v0.1.0` lands in HOR-299).
+4. **Pin for stability** (optional): the default is tracking upstream `master` (the deliberate sync above is the gate). To freeze on a known state, cut a tag on your fork and set `overlay.ref` to it. Base release tags are optional markers, not a workflow dependency.
 
 ## `forge apply --overlay`
 
