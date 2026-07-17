@@ -14,7 +14,7 @@ The fork model (Horizonshift Platform Direction §5):
 - **Client overlay repo = a fork** of this repo. Client-specific config lives in client-owned paths (no merge conflicts on upstream sync).
 - **Clients opt in to product updates** by syncing their fork with upstream (`git merge`/`rebase`). The default is tracking upstream `master`, and this deliberate sync IS the safety gate — pushes to this base repo have **no effect** on client infra until the client syncs. Pinning to a tag is optional (see below).
 - **No base+client merge at apply time** — the "merge" is a git-level fork sync, client-initiated. `forge apply --overlay` takes ONE input (the client fork, self-contained).
-- **Flux** (HOR-292, target architecture) watches the **client fork only** → push-to-Git auto-reconcile. Base-repo pushes don't trigger reconciliation.
+- **Flux** (HOR-292) watches the **client fork only** → push-to-Git auto-reconciles the overlay's `crds/client/`. Base-repo pushes don't trigger reconciliation. Enabled per-deployment in `forge.yaml` (`flux.enabled: true`); Flux's wiring (GitRepository + Kustomization + token Secret) is **forge-applied to the cluster**, not repo-resident (`flux install`, not `flux bootstrap git`) — the overlay repo stays pure.
 
 ## Repo structure
 
