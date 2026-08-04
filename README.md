@@ -2,7 +2,7 @@
 
 The **product base overlay repo** for the Iterabase platform — the upstream template each client deployment forks. Part of the forge overlay system (HOR-341).
 
-> **Status:** base prod recipe landed (HOR-299 — `values.yaml` carries the standard bare-metal prod recipe with per-deployment placeholders). The `pi/` tool library is deferred to HOR-351; CRD instances land per-deployment in client forks (e.g. OPO1).
+> **Status:** base prod recipe landed (HOR-299). HOR-397 adds reviewed gateway-tool bundle trees materialized from the exact Flux artifact; CRD instances remain deployment-specific.
 
 ## What this is
 
@@ -23,11 +23,13 @@ iterabase-overlay/
 ├── README.md              # this file (the fork-model design doc)
 ├── values.yaml            # base Helm values (deployment-recipe layer over the iterabase-platform chart defaults)
 ├── values.client.yaml     # client Helm value overrides (empty in base; clients fill their fork)
-└── crds/
-    ├── base/              # product base CRD INSTANCES (clients never edit — keeps upstream syncs clean)
-    │   └── kustomization.yaml
-    └── client/            # client CRD instances + supersede patches (client-owned; no sync conflict)
-        └── kustomization.yaml   # resources: [../base] + client files; patches: overrides
+├── crds/
+│   ├── base/              # product base CRD instances
+│   └── client/            # client instances + supersede patches
+└── tools/
+    ├── manifest.schema.json
+    ├── product/           # reviewed upstream self-contained ESM bundles
+    └── client/            # reviewed client bundles; logical-name precedence
 ```
 
 **CRD instances, not definitions.** The CRD *definitions* (the schemas for `Model`, `ModelBackend`, `PermissionPolicy`, `IdentityMapping`) ship with the control-plane Helm chart. This overlay carries **instances** (resources of those kinds). `forge apply` installs the chart first, then `kubectl apply -k crds/client/`, so the kinds exist before instances are applied.
@@ -69,9 +71,11 @@ forge apply --overlay https://github.com/<client>/iterabase-overlay.git
 
 `forge apply` is idempotent (re-clones to the current ref each run; `helm upgrade --install` + `kubectl apply -k` are idempotent). Private repos: `forge` prompts for a token (non-echo, scope-checked) or reads `FORGE_OVERLAY_TOKEN`.
 
-## `pi/` tool library — deferred
+## Gateway tools
 
-The `pi/` tree (`pi/product/` + `pi/client/`, the pi extensions + skills mounted into AgentSandboxes) is **not in this scaffold** — it lands with the pi harness (HOR-351). The fork-model rules above (supersede-not-edit, client-owned paths) will extend to `pi/product` vs `pi/client` when it arrives. forge does not materialize `pi/`; the harness/operator fetches it (continuous sync via Flux `source-controller`, HOR-292).
+`tools/product/` and `tools/client/` contain reviewed, self-contained Node 24 ESM gateway tools. They are loaded from the exact Flux `GitRepository` revision/digest by the trusted runner and never execute in AgentSandboxes. Client logical names supersede product names only through a new immutable version; collisions reject the revision. See [`tools/README.md`](tools/README.md) for the manifest, digest, validation, and rollout contract.
+
+Pi skills/extensions remain a separate `pi/` tree and are not gateway tools.
 
 ## References
 
