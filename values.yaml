@@ -14,3 +14,10 @@
 # recipe's deployability is validated by HOR-299's real OPO1 client fork.
 #
 # forge applies:  helm -f values.yaml -f values.client.yaml
+
+# Forge's cloud E2E disables k3s ServiceLB. Use a deterministic NodePort edge;
+# the earlier migration-source stage separately proves MetalLB/L2 delivery.
+ingress-nginx:
+  controller:
+    service:
+      type: NodePort
